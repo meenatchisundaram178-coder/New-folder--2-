@@ -262,3 +262,37 @@
   </script>
 </body>
 </html>
+<script>
+// ================= CONTACT FORM BACKEND CONNECTION =================
+const contactForm = document.getElementById("contactForm");
+const statusMsg = document.getElementById("status");
+
+if (contactForm) {
+  contactForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const formData = {
+      name: contactForm.name.value,
+      email: contactForm.email.value,
+      message: contactForm.message.value,
+    };
+
+    try {
+      const res = await fetch("/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+
+      statusMsg.textContent = data.message;
+      statusMsg.style.color = data.success ? "lime" : "red";
+
+      if (data.success) contactForm.reset();
+    } catch (err) {
+      statusMsg.textContent = "❌ Error sending message";
+      statusMsg.style.color = "red";
+    }
+  });
+}
+</script>
