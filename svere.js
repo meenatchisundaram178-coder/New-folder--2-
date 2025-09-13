@@ -1,62 +1,90 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const nodemailer = require("nodemailer");
-const mongoose = require("mongoose");
+import express from "express";
+import bodyParser from "body-parser";
+import nodemailer from "nodemailer";
+import mongoose from "mongoose";
+import morgan from "morgan";
+import dotenv from "dotenv";
 
+dotenv.config();
 const app = express();
-app.use(express.static("public")); // serve your HTML/CSS/JS
-app.use(bodyParser.urlencoded({ extended: true }));
 
-// Connect MongoDB (optional, remove if you don't want DB)
-mongoose.connect("mongodb://127.0.0.1:27017/portfolio");
+// Middleware
+app.use(express.static("public"));
+app.use(bodyParser.json());
+app.use(morgan("dev")); // logs all requests
 
-const MessageSchema = new mongoose.Schema({
+// -------------------- DATABASE --------------------
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+const contactSchema = new mongoose.Schema({
   name: String,
   email: String,
   message: String,
-  date: { type: Date, default: Date.now }
+  date: { type: Date, default: Date.now },
 });
-const Message = mongoose.model("Message", MessageSchema);
+const Contact = mongoose.model("Contact", contactSchema);
 
-// Contact form
+// -------------------- CONTACT FORM --------------------
 app.post("/contact", async (req, res) => {
-  const { name, email, message } = req.body;
+  try {
+    const { name, email, message } = req.body;
 
-  // Save to DB
-  const newMessage = new Message({ name, email, message });
-  await newMessage.save();
+    // 1. Save to DB
+    const newContact = new Contact({ name, email, message });
+    await newContact.save();
 
-  // Send email
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "your-email@gmail.com",
-      pass: "your-app-password" // must create App Password in Gmail
-    }
-  });
+    // 2. Send email
+    let transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: process.env.EMAIL, pass: process.env.PASS },
+    });
 
-  const mailOptions = {
-    from: email,
-    to: "your-email@gmail.com",
-    subject: `New Message from ${name}`,
-    text: message
-  };
+    await transporter.sendMail({
+      from: email,
+      to: process.env.EMAIL,
+      subject: `📩 New message from ${name}`,
+      text: message,
+    });
 
-  transporter.sendMail(mailOptions, (err, info) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).send("Error sending message.");
-    }
-    res.send("Message stored and email sent!");
-  });
+    res.json({ success: true, message: "Message sent successfully ✅" });
+  } catch (err) {
+    console.error("Error in /contact:", err);
+    res.status(500).json({ success: false, message: "Failed to send message ❌" });
+  }
 });
 
-// Projects API
-app.get("/projects", (req, res) => {
+// -------------------- PROJECTS API --------------------
+app.get("/api/projects", (req, res) => {
   res.json([
-    { title: "Portfolio Website", desc: "Modern portfolio website using HTML, CSS & JS.", img: "project1.jpg" },
-    { title: "Obstacle Avoiding Robot", desc: "Robotics project using Arduino & sensors.", img: "project2.jpg" }
+    {
+      title: "Portfolio Website",
+      desc: "Modern portfolio website using HTML, CSS, JS, and Node backend.",
+      img: "project1.jpg",
+    },
+    {
+      title: "Obstacle Avoiding Robot",
+      desc: "Robotics project using Arduino & sensors.",
+      img: "project2.jpg",
+    },
   ]);
 });
 
-app.listen(3000, () => console.log("✅ Server running on http://localhost:3000"));
+// -------------------- SKILLS API --------------------
+app.get("/api/skills", (req, res) => {
+  res.json([
+    "Python",
+    "Java",
+    "JavaScript",
+    "C",
+    "C++",
+    "Node.js",
+    "React",
+    "MongoDB",
+  ]);
+});
+
+// -------------------- START SERVER --------------------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
